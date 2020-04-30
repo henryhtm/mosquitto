@@ -37,40 +37,40 @@ Contributors:
 
 int handle__pingreq(struct mosquitto *mosq)
 {
-	int state;
+    int state;
 
-	assert(mosq);
+    assert(mosq);
 
-	state = mosquitto__get_state(mosq);
-	if(state != mosq_cs_active){
-		return MOSQ_ERR_PROTOCOL;
-	}
+    state = mosquitto__get_state(mosq);
+    if(state != mosq_cs_active){
+        return MOSQ_ERR_PROTOCOL;
+    }
 
 #ifdef WITH_BROKER
-	log__printf(NULL, MOSQ_LOG_DEBUG, "Received PINGREQ from %s", mosq->id);
+    log__printf(NULL, MOSQ_LOG_DEBUG, "Received PINGREQ from %s", mosq->id);
 #else
-	log__printf(mosq, MOSQ_LOG_DEBUG, "Client %s received PINGREQ", mosq->id);
+    log__printf(mosq, MOSQ_LOG_DEBUG, "Client %s received PINGREQ", mosq->id);
 #endif
-	return send__pingresp(mosq);
+    return send__pingresp(mosq);
 }
 
 int handle__pingresp(struct mosquitto *mosq)
 {
-	int state;
+    int state;
 
-	assert(mosq);
+    assert(mosq);
 
-	state = mosquitto__get_state(mosq);
-	if(state != mosq_cs_active){
-		return MOSQ_ERR_PROTOCOL;
-	}
+    state = mosquitto__get_state(mosq);
+    if(state != mosq_cs_active){
+        return MOSQ_ERR_PROTOCOL;
+    }
 
-	mosq->ping_t = 0; /* No longer waiting for a PINGRESP. */
+    mosq->ping_t = 0; /* No longer waiting for a PINGRESP. */
 #ifdef WITH_BROKER
-	log__printf(NULL, MOSQ_LOG_DEBUG, "Received PINGRESP from %s", mosq->id);
+    log__printf(NULL, MOSQ_LOG_DEBUG, "Received PINGRESP from %s", mosq->id);
 #else
-	log__printf(mosq, MOSQ_LOG_DEBUG, "Client %s received PINGRESP", mosq->id);
+    log__printf(mosq, MOSQ_LOG_DEBUG, "Client %s received PINGRESP", mosq->id);
 #endif
-	return MOSQ_ERR_SUCCESS;
+    return MOSQ_ERR_SUCCESS;
 }
 

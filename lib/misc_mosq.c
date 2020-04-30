@@ -25,153 +25,72 @@ Contributors:
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef WIN32
-#  include <winsock2.h>
-#  include <aclapi.h>
-#  include <io.h>
-#  include <lmcons.h>
-#else
-#  include <sys/stat.h>
-#endif
+#include <sys/stat.h>
 
 
 FILE *mosquitto__fopen(const char *path, const char *mode, bool restrict_read)
 {
-#ifdef WIN32
-	char buf[4096];
-	int rc;
-	rc = ExpandEnvironmentStrings(path, buf, 4096);
-	if(rc == 0 || rc > 4096){
-		return NULL;
-	}else{
-		if (restrict_read) {
-			HANDLE hfile;
-			SECURITY_ATTRIBUTES sec;
-			EXPLICIT_ACCESS ea;
-			PACL pacl = NULL;
-			char username[UNLEN + 1];
-			int ulen = UNLEN;
-			SECURITY_DESCRIPTOR sd;
-			DWORD dwCreationDisposition;
+    if (restrict_read) {
+        FILE *fptr;
+        mode_t old_mask;
 
-			switch(mode[0]){
-				case 'a':
-					dwCreationDisposition = OPEN_ALWAYS;
-					break;
-				case 'r':
-					dwCreationDisposition = OPEN_EXISTING;
-					break;
-				case 'w':
-					dwCreationDisposition = CREATE_ALWAYS;
-					break;
-				default:
-					return NULL;
-			}
+        old_mask = umask(0077);
+        fptr = fopen(path, mode);
+        umask(old_mask);
 
-			GetUserName(username, &ulen);
-			if (!InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION)) {
-				return NULL;
-			}
-			BuildExplicitAccessWithName(&ea, username, GENERIC_ALL, SET_ACCESS, NO_INHERITANCE);
-			if (SetEntriesInAcl(1, &ea, NULL, &pacl) != ERROR_SUCCESS) {
-				return NULL;
-			}
-			if (!SetSecurityDescriptorDacl(&sd, TRUE, pacl, FALSE)) {
-				LocalFree(pacl);
-				return NULL;
-			}
-
-			sec.nLength = sizeof(SECURITY_ATTRIBUTES);
-			sec.bInheritHandle = FALSE;
-			sec.lpSecurityDescriptor = &sd;
-
-			hfile = CreateFile(buf, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
-				&sec,
-				dwCreationDisposition,
-				FILE_ATTRIBUTE_NORMAL,
-				NULL);
-
-			LocalFree(pacl);
-
-			int fd = _open_osfhandle((intptr_t)hfile, 0);
-			if (fd < 0) {
-				return NULL;
-			}
-
-			FILE *fptr = _fdopen(fd, mode);
-			if (!fptr) {
-				_close(fd);
-				return NULL;
-			}
-			return fptr;
-
-		}else {
-			return fopen(buf, mode);
-		}
-	}
-#else
-	if (restrict_read) {
-		FILE *fptr;
-		mode_t old_mask;
-
-		old_mask = umask(0077);
-		fptr = fopen(path, mode);
-		umask(old_mask);
-
-		return fptr;
-	}else{
-		return fopen(path, mode);
-	}
-#endif
+        return fptr;
+    }else{
+        return fopen(path, mode);
+    }
 }
 
 
 char *misc__trimblanks(char *str)
 {
-	char *endptr;
+    char *endptr;
 
-	if(str == NULL) return NULL;
+    if(str == NULL) return NULL;
 
-	while(isspace(str[0])){
-		str++;
-	}
-	endptr = &str[strlen(str)-1];
-	while(endptr > str && isspace(endptr[0])){
-		endptr[0] = '\0';
-		endptr--;
-	}
-	return str;
+    while(isspace(str[0])){
+        str++;
+    }
+    endptr = &str[strlen(str)-1];
+    while(endptr > str && isspace(endptr[0])){
+        endptr[0] = '\0';
+        endptr--;
+    }
+    return str;
 }
 
 
 char *fgets_extending(char **buf, int *buflen, FILE *stream)
 {
-	char *rc;
-	char endchar;
-	int offset = 0;
-	char *newbuf;
+    char *rc;
+    char endchar;
+    int offset = 0;
+    char *newbuf;
 
-	if(stream == NULL || buf == NULL || buflen == NULL || *buflen < 1){
-		return NULL;
-	}
+    if(stream == NULL || buf == NULL || buflen == NULL || *buflen < 1){
+        return NULL;
+    }
 
-	do{
-		rc = fgets(&((*buf)[offset]), (*buflen)-offset, stream);
-		if(feof(stream)){
-			return rc;
-		}
+    do{
+        rc = fgets(&((*buf)[offset]), (*buflen)-offset, stream);
+        if(feof(stream)){
+            return rc;
+        }
 
-		endchar = (*buf)[strlen(*buf)-1];
-		if(endchar == '\n'){
-			return rc;
-		}
-		/* No EOL char found, so extend buffer */
-		offset = (*buflen)-1;
-		*buflen += 1000;
-		newbuf = realloc(*buf, *buflen);
-		if(!newbuf){
-			return NULL;
-		}
-		*buf = newbuf;
-	}while(1);
+        endchar = (*buf)[strlen(*buf)-1];
+        if(endchar == '\n'){
+            return rc;
+        }
+        /* No EOL char found, so extend buffer */
+        offset = (*buflen)-1;
+        *buflen += 1000;
+        newbuf = realloc(*buf, *buflen);
+        if(!newbuf){
+            return NULL;
+        }
+        *buf = newbuf;
+    }while(1);
 }

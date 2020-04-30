@@ -18,9 +18,9 @@ Contributors:
 #define TLS_MOSQ_H
 
 #ifdef WITH_TLS
-#  define SSL_DATA_PENDING(A) ((A)->ssl && SSL_pending((A)->ssl))
+#define SSL_DATA_PENDING(A) ((A)->ssl && SSL_pending((A)->ssl))
 #else
-#  define SSL_DATA_PENDING(A) 0
+#define SSL_DATA_PENDING(A) 0
 #endif
 
 #ifdef WITH_TLS

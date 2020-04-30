@@ -30,33 +30,33 @@ Contributors:
 
 int handle__disconnect(struct mosquitto *mosq)
 {
-	int rc;
-	uint8_t reason_code;
-	mosquitto_property *properties = NULL;
+    int rc;
+    uint8_t reason_code;
+    mosquitto_property *properties = NULL;
 
-	if(!mosq){
-		return MOSQ_ERR_INVAL;
-	}
+    if(!mosq){
+        return MOSQ_ERR_INVAL;
+    }
 
-	if(mosq->protocol != mosq_p_mqtt5){
-		return MOSQ_ERR_PROTOCOL;
-	}
+    if(mosq->protocol != mosq_p_mqtt5){
+        return MOSQ_ERR_PROTOCOL;
+    }
 
-	rc = packet__read_byte(&mosq->in_packet, &reason_code);
-	if(rc) return rc;
+    rc = packet__read_byte(&mosq->in_packet, &reason_code);
+    if(rc) return rc;
 
-	if(mosq->in_packet.remaining_length > 2){
-		rc = property__read_all(CMD_DISCONNECT, &mosq->in_packet, &properties);
-		if(rc) return rc;
-		mosquitto_property_free_all(&properties);
-	}
+    if(mosq->in_packet.remaining_length > 2){
+        rc = property__read_all(CMD_DISCONNECT, &mosq->in_packet, &properties);
+        if(rc) return rc;
+        mosquitto_property_free_all(&properties);
+    }
 
-	log__printf(mosq, MOSQ_LOG_DEBUG, "Received DISCONNECT (%d)", reason_code);
+    log__printf(mosq, MOSQ_LOG_DEBUG, "Received DISCONNECT (%d)", reason_code);
 
-	do_client_disconnect(mosq, reason_code, properties);
+    do_client_disconnect(mosq, reason_code, properties);
 
-	mosquitto_property_free_all(&properties);
+    mosquitto_property_free_all(&properties);
 
-	return MOSQ_ERR_SUCCESS;
+    return MOSQ_ERR_SUCCESS;
 }
 

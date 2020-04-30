@@ -20,23 +20,23 @@ Contributors:
 #include "mosquitto.h"
 
 struct mqtt__string {
-	char *v;
-	int len;
+    char *v;
+    int len;
 };
 
 struct mqtt5__property {
-	struct mqtt5__property *next;
-	union {
-		uint8_t i8;
-		uint16_t i16;
-		uint32_t i32;
-		uint32_t varint;
-		struct mqtt__string bin;
-		struct mqtt__string s;
-	} value;
-	struct mqtt__string name;
-	int32_t identifier;
-	bool client_generated;
+    struct mqtt5__property *next;
+    union {
+        uint8_t i8;
+        uint16_t i16;
+        uint32_t i32;
+        uint32_t varint;
+        struct mqtt__string bin;
+        struct mqtt__string s;
+    } value;
+    struct mqtt__string name;
+    int32_t identifier;
+    bool client_generated;
 };
 
 

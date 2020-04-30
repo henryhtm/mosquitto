@@ -24,3 +24,4 @@ int alias__find(struct mosquitto *mosq, char **topic, int alias);
 void alias__free_all(struct mosquitto *mosq);
 
 #endif
+

@@ -16,15 +16,7 @@ Contributors:
 #ifndef NET_MOSQ_H
 #define NET_MOSQ_H
 
-#ifndef WIN32
-#  include <unistd.h>
-#else
-#  include <winsock2.h>
-#  ifndef _SSIZE_T_DEFINED
-typedef SSIZE_T ssize_t;
-#    define _SSIZE_T_DEFINED
-#  endif
-#endif
+#include <unistd.h>
 
 #include "mosquitto_internal.h"
 #include "mosquitto.h"
@@ -33,15 +25,9 @@ typedef SSIZE_T ssize_t;
 struct mosquitto_db;
 #endif
 
-#ifdef WIN32
-#  define COMPAT_CLOSE(a) closesocket(a)
-#  define COMPAT_ECONNRESET WSAECONNRESET
-#  define COMPAT_EWOULDBLOCK WSAEWOULDBLOCK
-#else
-#  define COMPAT_CLOSE(a) close(a)
-#  define COMPAT_ECONNRESET ECONNRESET
-#  define COMPAT_EWOULDBLOCK EWOULDBLOCK
-#endif
+#define COMPAT_CLOSE(a) close(a)
+#define COMPAT_ECONNRESET ECONNRESET
+#define COMPAT_EWOULDBLOCK EWOULDBLOCK
 
 /* For when not using winsock libraries. */
 #ifndef INVALID_SOCKET
