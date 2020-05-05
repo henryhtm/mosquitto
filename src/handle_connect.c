@@ -392,16 +392,14 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
         return MOSQ_ERR_INVAL;
     }
 
-    /* Don't accept multiple CONNECT commands. */
+    /* 单次连接中，不允许发送多个CONNECT报文 */
     if(context->state != mosq_cs_new){
         log__printf(NULL, MOSQ_LOG_NOTICE, "Bad client %s sending multiple CONNECT messages.", context->id);
         rc = MOSQ_ERR_PROTOCOL;
         goto handle_connect_error;
     }
 
-    /* Read protocol name as length then bytes rather than with read_string
-     * because the length is fixed and we can check that. Removes the need
-     * for another malloc as well. */
+    /* 读取协议名称的长度 */
     if(packet__read_uint16(&context->in_packet, &slen16)){
         rc = 1;
         goto handle_connect_error;
@@ -411,12 +409,15 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
         rc = MOSQ_ERR_PROTOCOL;
         goto handle_connect_error;
     }
+    
+    /* 读取协议名称字符串 */
     if(packet__read_bytes(&context->in_packet, protocol_name, slen)){
         rc = MOSQ_ERR_PROTOCOL;
         goto handle_connect_error;
     }
     protocol_name[slen] = '\0';
 
+    /* 读取协议版本号 */
     if(packet__read_byte(&context->in_packet, &protocol_version)){
         rc = 1;
         goto handle_connect_error;
@@ -467,6 +468,7 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
         goto handle_connect_error;
     }
 
+    /* 读取连接标识符 */
     if(packet__read_byte(&context->in_packet, &connect_flags)){
         rc = 1;
         goto handle_connect_error;
@@ -506,29 +508,35 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
         goto handle_connect_error;
     }
 
+    /* 读取保活字段 */
     if(packet__read_uint16(&context->in_packet, &(context->keepalive))){
         rc = 1;
         goto handle_connect_error;
     }
 
     if(protocol_version == PROTOCOL_VERSION_v5){
+        /* 读取CONNECT报文中的所有属性 */
         rc = property__read_all(CMD_CONNECT, &context->in_packet, &properties);
         if(rc) goto handle_connect_error;
     }
+    
+    /* 将会话有效期、最大接收数量和最大报文长度属性
+       的属性值赋值到context结构体对应成员中 */
     property__process_connect(context, &properties);
 
     if(mosquitto_property_read_string(properties, MQTT_PROP_AUTHENTICATION_METHOD, &context->auth_method, false)){
         mosquitto_property_read_binary(properties, MQTT_PROP_AUTHENTICATION_DATA, &auth_data, &auth_data_len, false);
     }
-
+    /* 两种属性未处理：请求响应信息，请求故障信息 */
     mosquitto_property_free_all(&properties); /* FIXME - TEMPORARY UNTIL PROPERTIES PROCESSED */
 
+    /* 读取客户端ID */
     if(packet__read_string(&context->in_packet, &client_id, &slen)){
         rc = 1;
         goto handle_connect_error;
     }
 
-    if(slen == 0){
+    if(slen == 0){  /* 客户端未指定客户端ID时 */
         if(context->protocol == mosq_p_mqtt31){
             send__connack(db, context, 0, CONNACK_REFUSED_IDENTIFIER_REJECTED, NULL);
             rc = MOSQ_ERR_PROTOCOL;
@@ -561,12 +569,13 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
                     rc = MOSQ_ERR_NOMEM;
                     goto handle_connect_error;
                 }
+                /* 客户端ID分配完成后做好标记，在CONNACK报文中要携带该ID */
                 context->assigned_id = true;
             }
         }
     }
 
-    /* clientid_prefixes check */
+    /* 检查客户端ID的前缀 */
     if(db->config->clientid_prefixes){
         if(strncmp(db->config->clientid_prefixes, client_id, strlen(db->config->clientid_prefixes))){
             if(context->protocol == mosq_p_mqtt5){
@@ -580,6 +589,7 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
     }
 
     if(will){
+        /* 读取遗嘱属性列表，遗嘱主题和遗嘱负载 */
         rc = will__read(context, &will_struct, will_qos, will_retain);
         if(rc) goto handle_connect_error;
     }else{
@@ -592,6 +602,7 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
     }
 
     if(username_flag){
+        /* 读取用户名 */
         rc = packet__read_string(&context->in_packet, &username, &slen);
         if(rc == MOSQ_ERR_NOMEM){
             rc = MOSQ_ERR_NOMEM;
@@ -601,6 +612,8 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
                 /* Username flag given, but no username. Ignore. */
                 username_flag = 0;
             }else{
+                /*有用户名标识位但无用户名负载的情况，
+                  在MQTT V5.0协议中应该被当作错误处理 */
                 rc = MOSQ_ERR_PROTOCOL;
                 goto handle_connect_error;
             }
@@ -631,7 +644,7 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
     }
 
     if(context->in_packet.pos != context->in_packet.remaining_length){
-        /* Surplus data at end of packet, this must be an error. */
+        /* CONNECT报文中所有字段读取完成但还有数据剩余，当作错误处理 */
         rc = MOSQ_ERR_PROTOCOL;
         goto handle_connect_error;
     }
