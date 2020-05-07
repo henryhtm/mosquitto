@@ -846,16 +846,20 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
     context->will = will_struct;
 
     if(context->auth_method){
+        /* 如果有扩展认证，则开始扩展认证过程 */
         rc = mosquitto_security_auth_start(db, context, false, auth_data, auth_data_len, &auth_data_out, &auth_data_out_len);
         mosquitto__free(auth_data);
         if(rc == MOSQ_ERR_SUCCESS){
+            /* 认证成功，则回复CONNACK报文 */
             return connect__on_authorised(db, context, auth_data_out, auth_data_out_len);
         }else if(rc == MOSQ_ERR_AUTH_CONTINUE){
+            /* 设置状态为“认证中”，并回复AUTH报文 */
             mosquitto__set_state(context, mosq_cs_authenticating);
             rc = send__auth(db, context, MQTT_RC_CONTINUE_AUTHENTICATION, auth_data_out, auth_data_out_len);
             free(auth_data_out);
             return rc;
         }else{
+            /* 认证失败 */
             free(auth_data_out);
             will__clear(context);
             if(rc == MOSQ_ERR_AUTH){
@@ -876,6 +880,7 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
             }
         }
     }else{
+        /* 没有扩展认证时，直接回复CONNACK报文 */
         return connect__on_authorised(db, context, NULL, 0);
     }
 
