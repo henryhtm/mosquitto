@@ -47,7 +47,13 @@ int handle__auth(struct mosquitto_db *db, struct mosquitto *context)
     }
 
     if(context->in_packet.remaining_length > 0){
+    /* 当AUTH报文中有可变报头时 */
+        /* 读取AUTH的原因码 */
         if(packet__read_byte(&context->in_packet, &reason_code)) return 1;
+        /* 原因码不是继续认证/重新认证则断开连接。*/
+        /* 此处没有对原因码为成功进行处理，规范说原因码为成功可以省略，
+            但不是说一定会省略！在不省略的场景下会导致不正确的处理。*/
+        /* if( reason_code == MQTT_RC_SUCCESS ) {}*/
         if(reason_code != MQTT_RC_CONTINUE_AUTHENTICATION
                 && reason_code != MQTT_RC_REAUTHENTICATE){
 
@@ -69,13 +75,14 @@ int handle__auth(struct mosquitto_db *db, struct mosquitto *context)
             return rc;
         }
 
-
+        /* 读取认证方式属性 */
         if(mosquitto_property_read_string(properties, MQTT_PROP_AUTHENTICATION_METHOD, &auth_method, false) == NULL){
             mosquitto_property_free_all(&properties);
             send__disconnect(context, MQTT_RC_UNSPECIFIED, NULL);
             return MOSQ_ERR_PROTOCOL;
         }
 
+        /* 每个AUTH报文中都必须包含与CONNECT报文中相同的认证方式属性*/
         if(!auth_method || strcmp(auth_method, context->auth_method)){
             /* No method, or non-matching method */
             mosquitto__free(auth_method);
@@ -85,6 +92,7 @@ int handle__auth(struct mosquitto_db *db, struct mosquitto *context)
         }
         mosquitto__free(auth_method);
 
+        /* 读取认证数据属性值 */
         mosquitto_property_read_binary(properties, MQTT_PROP_AUTHENTICATION_DATA, &auth_data, &auth_data_len, false);
 
         mosquitto_property_free_all(&properties); /* FIXME - TEMPORARY UNTIL PROPERTIES PROCESSED */
@@ -94,17 +102,21 @@ int handle__auth(struct mosquitto_db *db, struct mosquitto *context)
 
 
     if(reason_code == MQTT_RC_REAUTHENTICATE){
-        /* This is a re-authentication attempt */
+        /* 设置状态为重新认证并开始认证过程 */
         mosquitto__set_state(context, mosq_cs_reauthenticating);
         rc = mosquitto_security_auth_start(db, context, true, auth_data, auth_data_len, &auth_data_out, &auth_data_out_len);
-    }else{
+    }
+    else{
         if(context->state != mosq_cs_reauthenticating){
             mosquitto__set_state(context, mosq_cs_authenticating);
         }
+
+        /* 通过扩展插件认证并给出要回复的认证数据 */
         rc = mosquitto_security_auth_continue(db, context, auth_data, auth_data_len, &auth_data_out, &auth_data_out_len);
     }
     mosquitto__free(auth_data);
     if(rc == MOSQ_ERR_SUCCESS){
+        /* 认证成功 */
         if(context->state == mosq_cs_authenticating){
             return connect__on_authorised(db, context, auth_data_out, auth_data_out_len);
         }else{
@@ -114,10 +126,12 @@ int handle__auth(struct mosquitto_db *db, struct mosquitto *context)
             return rc;
         }
     }else if(rc == MOSQ_ERR_AUTH_CONTINUE){
+        /* 继续认证 */
         rc = send__auth(db, context, MQTT_RC_CONTINUE_AUTHENTICATION, auth_data_out, auth_data_out_len);
         free(auth_data_out);
         return rc;
     }else{
+        /* 认证失败 */
         free(auth_data_out);
         if(context->state == mosq_cs_authenticating && context->will){
             /* Free will without sending if this is our first authentication attempt */
