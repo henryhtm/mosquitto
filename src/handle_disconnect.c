@@ -34,7 +34,8 @@ int handle__disconnect(struct mosquitto_db *db, struct mosquitto *context)
     if(!context){
         return MOSQ_ERR_INVAL;
     }
-
+    /* 主要对报文做点简单检查，然后处理会话有效期属性和
+       “带遗嘱断开”原因码，之后断开连接。*/
     if(context->protocol == mosq_p_mqtt5 && context->in_packet.remaining_length > 0){
         /* FIXME - must handle reason code */
         rc = packet__read_byte(&context->in_packet, &reason_code);
