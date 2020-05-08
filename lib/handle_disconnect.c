@@ -48,7 +48,10 @@ int handle__disconnect(struct mosquitto *mosq)
     if(mosq->in_packet.remaining_length > 2){
         rc = property__read_all(CMD_DISCONNECT, &mosq->in_packet, &properties);
         if(rc) return rc;
-        mosquitto_property_free_all(&properties);
+
+        /* 属性列表在代码do_client_disconnect会用到，因此不能在这里释放。
+           此处释放的话会导致报文中的属性列表不能被处理到。 */
+        //mosquitto_property_free_all(&properties);
     }
 
     log__printf(mosq, MOSQ_LOG_DEBUG, "Received DISCONNECT (%d)", reason_code);
