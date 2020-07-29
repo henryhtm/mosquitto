@@ -351,7 +351,7 @@ int config__parse_args(struct mosquitto_db *db, struct mosquitto__config *config
                     return MOSQ_ERR_INVAL;
                 }
             }else{
-                log__printf(NULL, MOSQ_LOG_ERR, "Error: -c argument given, but no config file specified.");
+                log__printf(NULL, MOSQ_LOG_ERR, "Error: %s argument given, but no config file specified.", argv[i]);
                 return MOSQ_ERR_INVAL;
             }
             i++;
@@ -364,7 +364,7 @@ int config__parse_args(struct mosquitto_db *db, struct mosquitto__config *config
             if(i<argc-1){
                 port_tmp = atoi(argv[i+1]);
                 if(port_tmp<1 || port_tmp>65535){
-                    log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid port specified (%d).", port_tmp);
+                    log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid port specified (%s).", argv[i+1]);
                     return MOSQ_ERR_INVAL;
                 }else{
                     if(config->default_listener.port){
@@ -373,7 +373,7 @@ int config__parse_args(struct mosquitto_db *db, struct mosquitto__config *config
                     config->default_listener.port = port_tmp;
                 }
             }else{
-                log__printf(NULL, MOSQ_LOG_ERR, "Error: -p argument given, but no port specified.");
+                log__printf(NULL, MOSQ_LOG_ERR, "Error: %s argument given, but no port specified.", argv[i]);
                 return MOSQ_ERR_INVAL;
             }
             i++;
