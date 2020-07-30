@@ -448,9 +448,7 @@ struct mosquitto_db{
 #endif
     int persistence_changes;
     struct mosquitto *ll_for_free;
-#ifdef WITH_EPOLL
     int epollfd;
-#endif
 };
 
 enum mosquitto__bridge_direction{

@@ -94,7 +94,6 @@ WITH_SHARED_LIBRARIES:=yes
 #WITH_ADNS:=yes
 
 # Build with epoll support.
-WITH_EPOLL:=yes
 
 # Build with bundled uthash.h
 WITH_BUNDLED_DEPS:=yes
@@ -302,11 +301,6 @@ ifeq ($(WITH_STRIP),yes)
 	STRIP_OPTS?=-s --strip-program=${CROSS_COMPILE}${STRIP}
 endif
 
-ifeq ($(WITH_EPOLL),yes)
-	ifeq ($(UNAME),Linux)
-		BROKER_CPPFLAGS:=$(BROKER_CPPFLAGS) -DWITH_EPOLL
-	endif
-endif
 
 ifeq ($(WITH_BUNDLED_DEPS),yes)
 	BROKER_CPPFLAGS:=$(BROKER_CPPFLAGS) -Ideps

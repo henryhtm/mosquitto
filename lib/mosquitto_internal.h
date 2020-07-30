@@ -323,9 +323,7 @@ struct mosquitto {
     struct mosquitto *for_free_next;
     struct session_expiry_list *expiry_list_item;
 #endif
-#ifdef WITH_EPOLL
     uint32_t events;
-#endif
 };
 
 #define STREMPTY(str) (str[0] == '\0')

@@ -20,10 +20,10 @@ Contributors:
 #define _GNU_SOURCE
 
 #include <assert.h>
-#ifdef WITH_EPOLL
+
 #include <sys/epoll.h>
 #define MAX_EVENTS 1000
-#endif
+
 #include <poll.h>
 #include <unistd.h>
 
@@ -53,11 +53,7 @@ extern bool flag_db_backup;
 extern bool flag_tree_print;
 extern int run;
 
-#ifdef WITH_EPOLL
 static void loop_handle_reads_writes(struct mosquitto_db *db, mosq_sock_t sock, uint32_t events);
-#else
-static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pollfds);
-#endif
 
 #ifdef WITH_WEBSOCKETS
 static void temp__expire_websockets_clients(struct mosquitto_db *db)
@@ -113,14 +109,10 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
     struct mosquitto *context, *ctxt_tmp;
     sigset_t sigblock, origsig;
     int i;
-#ifdef WITH_EPOLL
+
     int j;
     struct epoll_event ev, events[MAX_EVENTS];
-#else
-    struct pollfd *pollfds = NULL;
-    int pollfd_index;
-    int pollfd_max;
-#endif
+
 #ifdef WITH_BRIDGE
     int rc;
     int err;
@@ -139,17 +131,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
     sigaddset(&sigblock, SIGUSR2);
     sigaddset(&sigblock, SIGHUP);
 
-#ifndef WITH_EPOLL
-    pollfd_max = sysconf(_SC_OPEN_MAX);
 
-    pollfds = mosquitto__malloc(sizeof(struct pollfd)*pollfd_max);
-    if(!pollfds){
-        log__printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
-        return MOSQ_ERR_NOMEM;
-    }
-#endif
-
-#ifdef WITH_EPOLL
     db->epollfd = 0;
     if ((db->epollfd = epoll_create(MAX_EVENTS)) == -1) {
         log__printf(NULL, MOSQ_LOG_ERR, "Error in epoll creating: %s", strerror(errno));
@@ -182,7 +164,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
         }
     }
 #endif
-#endif
 
     while(run){
         context__free_disused(db);
@@ -192,17 +173,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
         }
 #endif
 
-#ifndef WITH_EPOLL
-        memset(pollfds, -1, sizeof(struct pollfd)*pollfd_max);
-
-        pollfd_index = 0;
-        for(i=0; i<listensock_count; i++){
-            pollfds[pollfd_index].fd = listensock[i];
-            pollfds[pollfd_index].events = POLLIN;
-            pollfds[pollfd_index].revents = 0;
-            pollfd_index++;
-        }
-#endif
 
         time_count = 0;
         HASH_ITER(hh_sock, db->contexts_by_sock, context, ctxt_tmp){
@@ -265,7 +235,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
                         || now - context->last_msg_in <= (time_t)(context->keepalive)*3/2){
 
                     if(db__message_write(db, context) == MOSQ_ERR_SUCCESS){
-#ifdef WITH_EPOLL
                         if(context->current_out_packet || context->state == mosq_cs_connect_pending || context->ws_want_write){
                             if(!(context->events & EPOLLOUT)) {
                                 ev.data.fd = context->sock;
@@ -291,17 +260,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
                                 context->events = EPOLLIN;
                             }
                         }
-#else
-                        pollfds[pollfd_index].fd = context->sock;
-                        pollfds[pollfd_index].events = POLLIN;
-                        pollfds[pollfd_index].revents = 0;
-                        if(context->current_out_packet || context->state == mosq_cs_connect_pending || context->ws_want_write){
-                            pollfds[pollfd_index].events |= POLLOUT;
-                            context->ws_want_write = false;
-                        }
-                        context->pollfd_index = pollfd_index;
-                        pollfd_index++;
-#endif
                     }else{
                         do_disconnect(db, context, MOSQ_ERR_CONN_LOST);
                     }
@@ -346,7 +304,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
                             }else if(rc == 0){
                                 rc = bridge__connect_step2(db, context);
                                 if(rc == MOSQ_ERR_SUCCESS){
-#ifdef WITH_EPOLL
                                     ev.data.fd = context->sock;
                                     ev.events = EPOLLIN;
                                     if(context->current_out_packet){
@@ -359,16 +316,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
                                     }else{
                                         context->events = ev.events;
                                     }
-#else
-                                    pollfds[pollfd_index].fd = context->sock;
-                                    pollfds[pollfd_index].events = POLLIN;
-                                    pollfds[pollfd_index].revents = 0;
-                                    if(context->current_out_packet){
-                                        pollfds[pollfd_index].events |= POLLOUT;
-                                    }
-                                    context->pollfd_index = pollfd_index;
-                                    pollfd_index++;
-#endif
                                 }else if(rc == MOSQ_ERR_CONN_PENDING){
                                     context->bridge->restart_t = 0;
                                 }else{
@@ -388,10 +335,8 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
                                 context->bridge->restart_t = 0;
                             }
                         }else{
-#ifdef WITH_EPOLL
                             /* clean any events triggered in previous connection */
                             context->events = 0;
-#endif
                             rc = bridge__connect_step1(db, context);
                             if(rc){
                                 context->bridge->cur_address++;
@@ -411,7 +356,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
                                 if(context->bridge->round_robin == false && context->bridge->cur_address != 0){
                                     context->bridge->primary_retry = now + 5;
                                 }
-#ifdef WITH_EPOLL
                                 ev.data.fd = context->sock;
                                 ev.events = EPOLLIN;
                                 if(context->current_out_packet){
@@ -424,16 +368,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
                                 }else{
                                     context->events = ev.events;
                                 }
-#else
-                                pollfds[pollfd_index].fd = context->sock;
-                                pollfds[pollfd_index].events = POLLIN;
-                                pollfds[pollfd_index].revents = 0;
-                                if(context->current_out_packet){
-                                    pollfds[pollfd_index].events |= POLLOUT;
-                                }
-                                context->pollfd_index = pollfd_index;
-                                pollfd_index++;
-#endif
                             }else{
                                 context->bridge->cur_address++;
                                 if(context->bridge->cur_address == context->bridge->address_count){
@@ -449,13 +383,11 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
 #endif
 
         sigprocmask(SIG_SETMASK, &sigblock, &origsig);
-#ifdef WITH_EPOLL
+
         fdcount = epoll_wait(db->epollfd, events, MAX_EVENTS, 100);
-#else
-        fdcount = poll(pollfds, pollfd_index, 100);
-#endif
+
         sigprocmask(SIG_SETMASK, &origsig, NULL);
-#ifdef WITH_EPOLL
+
         switch(fdcount){
         case -1:
             if(errno != EINTR){
@@ -491,22 +423,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
                 }
             }
         }
-#else
-        if(fdcount == -1){
-            {
-                log__printf(NULL, MOSQ_LOG_ERR, "Error in poll: %s.", strerror(errno));
-            }
-        }else{
-            loop_handle_reads_writes(db, pollfds);
 
-            for(i=0; i<listensock_count; i++){
-                if(pollfds[i].revents & (POLLIN | POLLPRI)){
-                    while(net__socket_accept(db, listensock[i]) != -1){
-                    }
-                }
-            }
-        }
-#endif
         now = time(NULL);
         session_expiry__check(db, now);
         will_delay__check(db, now);
@@ -570,21 +487,17 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
 #endif
     }
 
-#ifdef WITH_EPOLL
     (void) close(db->epollfd);
     db->epollfd = 0;
-#else
-    mosquitto__free(pollfds);
-#endif
+
     return MOSQ_ERR_SUCCESS;
 }
 
 void do_disconnect(struct mosquitto_db *db, struct mosquitto *context, int reason)
 {
     char *id;
-#ifdef WITH_EPOLL
     struct epoll_event ev;
-#endif
+
 #ifdef WITH_WEBSOCKETS
     bool is_duplicate = false;
 #endif
@@ -606,11 +519,9 @@ void do_disconnect(struct mosquitto_db *db, struct mosquitto *context, int reaso
         }
         if(context->sock != INVALID_SOCKET){
             HASH_DELETE(hh_sock, db->contexts_by_sock, context);
-#ifdef WITH_EPOLL
             if (epoll_ctl(db->epollfd, EPOLL_CTL_DEL, context->sock, &ev) == -1) {
                 log__printf(NULL, MOSQ_LOG_DEBUG, "Error in epoll disconnecting websockets: %s", strerror(errno));
             }
-#endif        
             context->sock = INVALID_SOCKET;
             context->pollfd_index = -1;
         }
@@ -656,33 +567,24 @@ void do_disconnect(struct mosquitto_db *db, struct mosquitto *context, int reaso
                 log__printf(NULL, MOSQ_LOG_NOTICE, "Client %s disconnected.", id);
             }
         }
-#ifdef WITH_EPOLL
         if (context->sock != INVALID_SOCKET && epoll_ctl(db->epollfd, EPOLL_CTL_DEL, context->sock, &ev) == -1) {
             if(db->config->connection_messages == true){
                 log__printf(NULL, MOSQ_LOG_DEBUG, "Error in epoll disconnecting: %s", strerror(errno));
             }
         }
-#endif        
         context__disconnect(db, context);
     }
 }
 
 
-#ifdef WITH_EPOLL
 static void loop_handle_reads_writes(struct mosquitto_db *db, mosq_sock_t sock, uint32_t events)
-#else
-static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pollfds)
-#endif
 {
     struct mosquitto *context;
-#ifndef WITH_EPOLL
-    struct mosquitto *ctxt_tmp;
-#endif
+
     int err;
     socklen_t len;
     int rc;
 
-#ifdef WITH_EPOLL
     int i;
     context = NULL;
     HASH_FIND(hh_sock, db->contexts_by_sock, &sock, sizeof(mosq_sock_t), context);
@@ -690,27 +592,14 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
         return;
     }
     for (i=0;i<1;i++) {
-#else
-    HASH_ITER(hh_sock, db->contexts_by_sock, context, ctxt_tmp){
-        if(context->pollfd_index < 0){
-            continue;
-        }
-
-        assert(pollfds[context->pollfd_index].fd == context->sock);
-#endif
 
 #ifdef WITH_WEBSOCKETS
         if(context->wsi){
             struct lws_pollfd wspoll;
-#ifdef WITH_EPOLL
             wspoll.fd = context->sock;
             wspoll.events = context->events;
             wspoll.revents = events;
-#else
-            wspoll.fd = pollfds[context->pollfd_index].fd;
-            wspoll.events = pollfds[context->pollfd_index].events;
-            wspoll.revents = pollfds[context->pollfd_index].revents;
-#endif
+
 #ifdef LWS_LIBRARY_VERSION_NUMBER
             lws_service_fd(lws_get_context(context->wsi), &wspoll);
 #else
@@ -721,19 +610,11 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 #endif
 
 #ifdef WITH_TLS
-#ifdef WITH_EPOLL
         if(events & EPOLLOUT ||
-#else
-        if(pollfds[context->pollfd_index].revents & POLLOUT ||
-#endif
                 context->want_write ||
                 (context->ssl && context->state == mosq_cs_new)){
 #else
-#ifdef WITH_EPOLL
         if(events & EPOLLOUT){
-#else            
-        if(pollfds[context->pollfd_index].revents & POLLOUT){
-#endif
 #endif
             if(context->state == mosq_cs_connect_pending){
                 len = sizeof(int);
@@ -760,19 +641,12 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
         }
     }
 
-#ifdef WITH_EPOLL
     context = NULL;
     HASH_FIND(hh_sock, db->contexts_by_sock, &sock, sizeof(mosq_sock_t), context);
     if(!context) {
         return;
     }
     for (i=0;i<1;i++) {
-#else
-    HASH_ITER(hh_sock, db->contexts_by_sock, context, ctxt_tmp){
-        if(context->pollfd_index < 0){
-            continue;
-        }
-#endif
 #ifdef WITH_WEBSOCKETS
         if(context->wsi){
             // Websocket are already handled above
@@ -781,18 +655,10 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 #endif
 
 #ifdef WITH_TLS
-#ifdef WITH_EPOLL
         if(events & EPOLLIN ||
-#else
-        if(pollfds[context->pollfd_index].revents & POLLIN ||
-#endif
                 (context->ssl && context->state == mosq_cs_new)){
 #else
-#ifdef WITH_EPOLL
         if(events & EPOLLIN){
-#else
-        if(pollfds[context->pollfd_index].revents & POLLIN){
-#endif
 #endif
             do{
                 rc = packet__read(db, context);
@@ -802,11 +668,7 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
                 }
             }while(SSL_DATA_PENDING(context));
         }else{
-#ifdef WITH_EPOLL
             if(events & (EPOLLERR | EPOLLHUP)){
-#else
-            if(context->pollfd_index >= 0 && pollfds[context->pollfd_index].revents & (POLLERR | POLLNVAL | POLLHUP)){
-#endif
                 do_disconnect(db, context, MOSQ_ERR_CONN_LOST);
                 continue;
             }
