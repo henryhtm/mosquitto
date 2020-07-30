@@ -67,7 +67,7 @@ void handle_sigint(int signal)
     run = 0;
 }
 
-/* Signal handler for SIGUSR1 - backup the db. */
+/* Signal handler for SIGUSR1(eg. "kill -USR1 pid") - backup the db. */
 void handle_sigusr1(int signal)
 {
     UNUSED(signal);
@@ -77,7 +77,7 @@ void handle_sigusr1(int signal)
 #endif
 }
 
-/* Signal handler for SIGUSR2 - print subscription / retained tree. */
+/* Signal handler for SIGUSR2(eg. "kill -USR2 pid") - print subscription / retained tree. */
 void handle_sigusr2(int signal)
 {
     UNUSED(signal);
