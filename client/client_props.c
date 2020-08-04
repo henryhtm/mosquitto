@@ -21,15 +21,8 @@ Contributors:
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef WIN32
 #include <unistd.h>
 #include <strings.h>
-#else
-#include <process.h>
-#include <winsock2.h>
-#define snprintf sprintf_s
-#define strncasecmp _strnicmp
-#endif
 
 #include "mosquitto.h"
 #include "mqtt_protocol.h"

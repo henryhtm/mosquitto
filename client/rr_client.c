@@ -22,14 +22,8 @@ Contributors:
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#ifndef WIN32
 #include <unistd.h>
 #include <signal.h>
-#else
-#include <process.h>
-#include <winsock2.h>
-#define snprintf sprintf_s
-#endif
 
 #include <mosquitto.h>
 #include <mqtt_protocol.h>
@@ -53,7 +47,6 @@ bool process_messages = true;
 int msg_count = 0;
 struct mosquitto *mosq = NULL;
 
-#ifndef WIN32
 void my_signal_handler(int signum)
 {
 	if(signum == SIGALRM){
@@ -61,7 +54,6 @@ void my_signal_handler(int signum)
 		mosquitto_disconnect_v5(mosq, MQTT_RC_DISCONNECT_WITH_WILL_MSG, cfg.disconnect_props);
 	}
 }
-#endif
 
 void print_message(struct mosq_config *cfg, const struct mosquitto_message *message);
 
@@ -164,9 +156,7 @@ void print_usage(void)
 	printf("Usage: mosquitto_rr {[-h host] [-p port] [-u username] [-P password] -t topic | -L URL} -e response-topic\n");
 	printf("                    [-c] [-k keepalive] [-q qos] [-R]\n");
 	printf("                    [-F format]\n");
-#ifndef WIN32
 	printf("                    [-W timeout_secs]\n");
-#endif
 #ifdef WITH_SRV
 	printf("                    [-A bind_address] [-S]\n");
 #else
@@ -213,9 +203,7 @@ void print_usage(void)
 	printf(" -v : print received messages verbosely.\n");
 	printf(" -V : specify the version of the MQTT protocol to use when connecting.\n");
 	printf("      Defaults to 5.\n");
-#ifndef WIN32
 	printf(" -W : Specifies a timeout in seconds how long to wait for a response.\n");
-#endif
 	printf(" --help : display this message.\n");
 	printf(" --quiet : don't print error messages.\n");
 	printf(" --will-payload : payload for the client Will, which is sent by the broker in case of\n");
@@ -254,9 +242,7 @@ void print_usage(void)
 int main(int argc, char *argv[])
 {
 	int rc;
-#ifndef WIN32
-		struct sigaction sigact;
-#endif
+	struct sigaction sigact;
 
 	mosquitto_lib_init();
 
@@ -318,7 +304,6 @@ int main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-#ifndef WIN32
 	sigact.sa_handler = my_signal_handler;
 	sigemptyset(&sigact.sa_mask);
 	sigact.sa_flags = 0;
@@ -331,7 +316,6 @@ int main(int argc, char *argv[])
 	if(cfg.timeout){
 		alarm(cfg.timeout);
 	}
-#endif
 
 	do{
 		rc = mosquitto_loop(mosq, -1, 1);

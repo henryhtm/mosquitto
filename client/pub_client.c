@@ -21,14 +21,8 @@ Contributors:
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef WIN32
 #include <sys/time.h>
 #include <time.h>
-#else
-#include <process.h>
-#include <winsock2.h>
-#define snprintf sprintf_s
-#endif
 
 #include <mqtt_protocol.h>
 #include <mosquitto.h>
@@ -47,26 +41,6 @@ static int publish_count = 0;
 static bool ready_for_repeat = false;
 static volatile int status = STATUS_CONNECTING;
 
-#ifdef WIN32
-static uint64_t next_publish_tv;
-
-static void set_repeat_time(void)
-{
-	uint64_t ticks = GetTickCount64();
-	next_publish_tv = ticks + cfg.repeat_delay.tv_sec*1000 + cfg.repeat_delay.tv_usec/1000;
-}
-
-static int check_repeat_time(void)
-{
-	uint64_t ticks = GetTickCount64();
-
-	if(ticks > next_publish_tv){
-		return 1;
-	}else{
-		return 0;
-	}
-}
-#else
 
 static struct timeval next_publish_tv;
 
@@ -95,7 +69,6 @@ static int check_repeat_time(void)
 	}
 	return 0;
 }
-#endif
 
 void my_disconnect_callback(struct mosquitto *mosq, void *obj, int rc, const mosquitto_property *properties)
 {
@@ -287,14 +260,10 @@ int pub_stdin_line_loop(struct mosquitto *mosq)
 				mosquitto_disconnect_v5(mosq, 0, cfg.disconnect_props);
 				disconnect_sent = true;
 			}
-#ifdef WIN32
-			Sleep(100);
-#else
 			struct timespec ts;
 			ts.tv_sec = 0;
 			ts.tv_nsec = 100000000;
 			nanosleep(&ts, NULL);
-#endif
 		}
 	}while(stdin_finished == false);
 	mosquitto_loop_stop(mosq, false);

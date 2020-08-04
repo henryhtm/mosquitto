@@ -19,11 +19,7 @@ Contributors:
 
 #include <stdio.h>
 
-#ifdef WIN32
-#  include <winsock2.h>
-#else
-#  include <sys/time.h>
-#endif
+#include <sys/time.h>
 
 /* pub_client.c modes */
 #define MSGMODE_NONE 0

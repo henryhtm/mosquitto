@@ -22,15 +22,8 @@ Contributors:
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef WIN32
 #include <unistd.h>
 #include <strings.h>
-#else
-#include <process.h>
-#include <winsock2.h>
-#define snprintf sprintf_s
-#define strncasecmp _strnicmp
-#endif
 
 #include <mosquitto.h>
 #include <mqtt_protocol.h>
@@ -215,17 +208,12 @@ int client_config_load(struct mosq_config *cfg, int pub_or_sub, int argc, char *
 	int len;
 	char *args[3];
 
-#ifndef WIN32
 	char *env;
-#else
-	char env[1024];
-#endif
 	args[0] = NULL;
 
 	init_config(cfg, pub_or_sub);
 
 	/* Default config file */
-#ifndef WIN32
 	env = getenv("XDG_CONFIG_HOME");
 	if(env){
 		len = strlen(env) + strlen("/mosquitto_pub") + 1;
@@ -261,26 +249,6 @@ int client_config_load(struct mosq_config *cfg, int pub_or_sub, int argc, char *
 			loc[len-1] = '\0';
 		}
 	}
-
-#else
-	rc = GetEnvironmentVariable("USERPROFILE", env, 1024);
-	if(rc > 0 && rc < 1024){
-		len = strlen(env) + strlen("\\mosquitto_pub.conf") + 1;
-		loc = malloc(len);
-		if(!loc){
-			err_printf(cfg, "Error: Out of memory.\n");
-			return 1;
-		}
-		if(pub_or_sub == CLIENT_PUB){
-			snprintf(loc, len, "%s\\mosquitto_pub.conf", env);
-		}else if(pub_or_sub == CLIENT_SUB){
-			snprintf(loc, len, "%s\\mosquitto_sub.conf", env);
-		}else{
-			snprintf(loc, len, "%s\\mosquitto_rr.conf", env);
-		}
-		loc[len-1] = '\0';
-	}
-#endif
 
 	if(loc){
 		fptr = fopen(loc, "rt");
@@ -1185,11 +1153,7 @@ int client_id_generate(struct mosq_config *cfg)
 
 int client_connect(struct mosquitto *mosq, struct mosq_config *cfg)
 {
-#ifndef WIN32
 	char *err;
-#else
-	char err[1024];
-#endif
 	int rc;
 	int port;
 
@@ -1221,11 +1185,7 @@ int client_connect(struct mosquitto *mosq, struct mosq_config *cfg)
 #endif
 	if(rc>0){
 		if(rc == MOSQ_ERR_ERRNO){
-#ifndef WIN32
 			err = strerror(errno);
-#else
-			FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errno, 0, (LPTSTR)&err, 1024, NULL);
-#endif
 			err_printf(cfg, "Error: %s\n", err);
 		}else{
 			err_printf(cfg, "Unable to connect (%s).\n", mosquitto_strerror(rc));

@@ -22,17 +22,7 @@ Contributors:
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#ifndef WIN32
 #include <unistd.h>
-#else
-#include <process.h>
-#include <winsock2.h>
-#define snprintf sprintf_s
-#endif
-
-#ifdef __APPLE__
-#  include <sys/time.h>
-#endif
 
 #include <mosquitto.h>
 #include "client_shared.h"
@@ -41,32 +31,15 @@ extern struct mosq_config cfg;
 
 static int get_time(struct tm **ti, long *ns)
 {
-#ifdef WIN32
-	SYSTEMTIME st;
-#elif defined(__APPLE__)
-	struct timeval tv;
-#else
 	struct timespec ts;
-#endif
 	time_t s;
 
-#ifdef WIN32
-	s = time(NULL);
-
-	GetLocalTime(&st);
-	*ns = st.wMilliseconds*1000000L;
-#elif defined(__APPLE__)
-	gettimeofday(&tv, NULL);
-	s = tv.tv_sec;
-	*ns = tv.tv_usec*1000;
-#else
 	if(clock_gettime(CLOCK_REALTIME, &ts) != 0){
 		err_printf(&cfg, "Error obtaining system time.\n");
 		return 1;
 	}
 	s = ts.tv_sec;
 	*ns = ts.tv_nsec;
-#endif
 
 	*ti = localtime(&s);
 	if(!(*ti)){
