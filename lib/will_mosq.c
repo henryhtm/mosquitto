@@ -35,7 +35,9 @@ Contributors:
 #include "util_mosq.h"
 #include "will_mosq.h"
 
-int will__set(struct mosquitto *mosq, const char *topic, int payloadlen, const void *payload, int qos, bool retain, mosquitto_property *properties)
+/*   将遗嘱消息保存到对应客户端的上下文中    */
+int will__set(struct mosquitto *mosq, const char *topic, int payloadlen, const void *payload, 
+                                        int qos, bool retain, mosquitto_property *properties)
 {
     int rc = MOSQ_ERR_SUCCESS;
     mosquitto_property *p;
@@ -44,7 +46,9 @@ int will__set(struct mosquitto *mosq, const char *topic, int payloadlen, const v
     if(payloadlen < 0 || payloadlen > MQTT_MAX_PAYLOAD) return MOSQ_ERR_PAYLOAD_SIZE;
     if(payloadlen > 0 && !payload) return MOSQ_ERR_INVAL;
 
+    /* 检查遗嘱主题是否有效 */
     if(mosquitto_pub_topic_check(topic)) return MOSQ_ERR_INVAL;
+    /* 检查遗嘱主题是否是有效的UTF-8编码字符串 */
     if(mosquitto_validate_utf8(topic, strlen(topic))) return MOSQ_ERR_MALFORMED_UTF8;
 
     if(properties){
@@ -53,13 +57,14 @@ int will__set(struct mosquitto *mosq, const char *topic, int payloadlen, const v
         }
         p = properties;
         while(p){
+            /* 检查每个属性是否与正确的MQTT报文对应 */
             rc = mosquitto_property_check_command(CMD_WILL, p->identifier);
             if(rc) return rc;
             p = p->next;
         }
     }
 
-    if(mosq->will){
+    if(mosq->will){ /* 释放之前保存的遗嘱消息 */
         mosquitto__free(mosq->will->msg.topic);
         mosquitto__free(mosq->will->msg.payload);
         mosquitto_property_free_all(&mosq->will->properties);
@@ -106,6 +111,7 @@ cleanup:
     return rc;
 }
 
+/*    清除对应客户端上下文中的遗嘱消息    */
 int will__clear(struct mosquitto *mosq)
 {
     if(!mosq->will) return MOSQ_ERR_SUCCESS;
