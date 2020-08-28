@@ -29,7 +29,7 @@ Contributors:
 
 time_t mosquitto_time(void)
 {
-#ifdef _POSIX_TIMERS>0 && defined(_POSIX_MONOTONIC_CLOCK)
+#if _POSIX_TIMERS>0 && defined(_POSIX_MONOTONIC_CLOCK)
     struct timespec tp;
 
     clock_gettime(CLOCK_MONOTONIC, &tp);
