@@ -30,6 +30,9 @@ Contributors:
 #include "socks_mosq.h"
 #include "util_mosq.h"
 
+#define FULLID_LEN      (24)
+
+static char s_pPrefixID[] = "mosq-" ;
 static char alphanum[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 static int mosquitto__reconnect(struct mosquitto *mosq, bool blocking, const mosquitto_property *properties);
@@ -40,26 +43,31 @@ static int mosquitto__connect_init(struct mosquitto *mosq, const char *host, int
 {
     int i;
     int rc;
+    int prefixLen = 0 ;
 
     if(!mosq) return MOSQ_ERR_INVAL;
     if(!host || port <= 0) return MOSQ_ERR_INVAL;
     if(keepalive < 5) return MOSQ_ERR_INVAL;
 
     if(mosq->id == NULL && (mosq->protocol == mosq_p_mqtt31 || mosq->protocol == mosq_p_mqtt311)){
-        mosq->id = (char *)mosquitto__calloc(24, sizeof(char));
+        mosq->id = (char *)mosquitto__calloc(FULLID_LEN, sizeof(char));
         if(!mosq->id){
             return MOSQ_ERR_NOMEM;
         }
-        mosq->id[0] = 'm';
-        mosq->id[1] = 'o';
-        mosq->id[2] = 's';
-        mosq->id[3] = 'q';
-        mosq->id[4] = '-';
+        prefixLen = strlen(s_pPrefixID) ;
+        if( prefixLen >= FULLID_LEN )
+        {
+            return MOSQ_ERR_UNKNOWN ;
+        }
+        for( i = 0 ; i < prefixLen ; i++ )
+        {
+            mosq->id[i] = s_pPrefixID[i] ;
+        }
 
-        rc = util__random_bytes(&mosq->id[5], 18);
+        rc = util__random_bytes(&mosq->id[prefixLen], FULLID_LEN-prefixLen-1);
         if(rc) return rc;
 
-        for(i=5; i<23; i++){
+        for(i=prefixLen; i<FULLID_LEN-1; i++){
             mosq->id[i] = alphanum[(mosq->id[i]&0x7F)%(sizeof(alphanum)-1)];
         }
     }
