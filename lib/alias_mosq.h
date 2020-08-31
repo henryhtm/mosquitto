@@ -19,8 +19,13 @@ Contributors:
 
 #include "mosquitto_internal.h"
 
+/* 将主题及其别名数值加入对应的上下文中 */
 int alias__add(struct mosquitto *mosq, const char *topic, int alias);
+
+/* 查找指定别名数值对应的主题名称 */
 int alias__find(struct mosquitto *mosq, char **topic, int alias);
+
+/* 清除对应上下文中所有的主题别名 */
 void alias__free_all(struct mosquitto *mosq);
 
 #endif
