@@ -4,6 +4,19 @@
  * Platform options
  * ============================================================ */
 
+//#define FOR_CODE_READING  /* 仅供代码阅读和分析时使用，编译时必须关闭该宏 */
+#ifdef FOR_CODE_READING
+/* 没在项目代码文件中显式定义的宏没办法被代码编辑工具识别到，需要手工将宏添加到这里 */
+#define WITH_TLS
+#define WITH_TLS_PSK
+#define WITH_THREADING
+#define WITH_SOCKS
+#define WITH_BROKER
+#define WITH_MEMORY_TRACKING
+#define __GLIBC__
+#include "Error:Please undefine FOR_CODE_READING."
+#endif
+
 #ifdef __APPLE__
 #  define __DARWIN_C_SOURCE
 #elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__SYMBIAN32__) || defined(__QNX__)
