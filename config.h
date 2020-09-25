@@ -13,6 +13,8 @@
 #define WITH_SOCKS
 #define WITH_BROKER
 #define WITH_MEMORY_TRACKING
+#define WITH_PERSISTENCE
+#define WITH_SYS_TREE
 #define __GLIBC__
 #include "Error:Please undefine FOR_CODE_READING."
 #endif
