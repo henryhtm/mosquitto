@@ -38,7 +38,14 @@ Contributors:
 #include "util_mosq.h"
 #include "mqtt_protocol.h"
 
-
+/********************************************************************************* 
+* FUNC: 比较两个字符串是否相同 
+* Parameters:
+*   p1      : [IN] 第1个待比较的字符串
+*   p2      : [IN] 第2个待比较的字符串
+* Return: 
+*   [int] 两个字符串第一个不同字符的差值
+*********************************************************************************/
 int scmp_p(const void *p1, const void *p2)
 {
     const char *s1 = *(const char **)p1;
@@ -61,11 +68,19 @@ int scmp_p(const void *p1, const void *p2)
         s1++;
         s2++;
     }
-
     return s1[0] - s2[0];
 }
 
-
+/********************************************************************************* 
+* FUNC: 获取指定目录中的文件列表 
+* Parameters:
+*   include_dir : [IN] 需要查找配置文件的目录路径
+*   files       : [OUT] 配置文件的文件名列表（包含目录路径）
+*   file_count  : [OUT] 配置文件的个数
+* Return:
+*   [int]   0   : 函数处理成功
+*   [int] 其他    : 函数处理出错
+*********************************************************************************/
 int config__get_dir_files(const char *include_dir, char ***files, int *file_count)
 {
     char **l_files = NULL;
