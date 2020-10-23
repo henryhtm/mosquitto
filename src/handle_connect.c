@@ -36,7 +36,7 @@ Contributors:
 #include <libwebsockets.h>
 #endif
 
-
+/* 将数值转换为16进制字符，例如：12转换为'C'，7转换为'7'。 */
 static char nibble_to_hex(uint8_t value)
 {
     if(value < 0x0A){
@@ -46,6 +46,9 @@ static char nibble_to_hex(uint8_t value)
     }
 }
 
+/* 生成格式为"prefixXXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"的客户端ID号，
+   其中"prefix"是指定的前缀字符串，"X"是"0-9A-F"的16进制字符 */
+#define ID_NUM_CNT    (16)
 static char *client_id_gen(int *idlen, const char *auto_id_prefix, int auto_id_prefix_len)
 {
     char *client_id;
@@ -53,7 +56,7 @@ static char *client_id_gen(int *idlen, const char *auto_id_prefix, int auto_id_p
     int i;
     int pos;
 
-    if(util__random_bytes(rnd, 16)) return NULL;
+    if(util__random_bytes(rnd, ID_NUM_CNT)) return NULL;
 
     *idlen = 36 + auto_id_prefix_len;
 
@@ -66,7 +69,7 @@ static char *client_id_gen(int *idlen, const char *auto_id_prefix, int auto_id_p
     }
 
     pos = 0;
-    for(i=0; i<16; i++){
+    for(i=0; i<ID_NUM_CNT; i++){
         client_id[auto_id_prefix_len + pos + 0] = nibble_to_hex(rnd[i] & 0x0F);
         client_id[auto_id_prefix_len + pos + 1] = nibble_to_hex((rnd[i] >> 4) & 0x0F);
         pos += 2;
@@ -423,6 +426,7 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
         goto handle_connect_error;
     }
     if(!strcmp(protocol_name, PROTOCOL_NAME_v31)){
+        /* 协议名称为"MQIsdp"时，版本号必须为3。 */
         if((protocol_version&0x7F) != PROTOCOL_VERSION_v31){
             if(db->config->connection_messages == true){
                 log__printf(NULL, MOSQ_LOG_INFO, "Invalid protocol version %d in CONNECT from %s.",
@@ -474,6 +478,7 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
         goto handle_connect_error;
     }
     if(context->protocol == mosq_p_mqtt311 || context->protocol == mosq_p_mqtt5){
+        /* MQTT协议3.1.1和5.0版本中，连接标识符最低位必须为0 */
         if((connect_flags & 0x01) != 0x00){
             rc = MOSQ_ERR_PROTOCOL;
             goto handle_connect_error;
@@ -481,11 +486,11 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
     }
 
     clean_start = (connect_flags & 0x02) >> 1;
-    /* session_expiry_interval will be overriden if the properties are read later */
     if(clean_start == false && protocol_version != PROTOCOL_VERSION_v5){
-        /* v3* has clean_start == false mean the session never expires */
+        /* MQTT 5.0之前的版本中，clean_start标志位为0表示会话永不过期 */
         context->session_expiry_interval = UINT32_MAX;
     }else{
+        /* 后面如果读到会话过期时间属性后再赋值。 */
         context->session_expiry_interval = 0;
     }
     will = connect_flags & 0x04;
@@ -496,7 +501,7 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
         rc = MOSQ_ERR_PROTOCOL;
         goto handle_connect_error;
     }
-    will_retain = ((connect_flags & 0x20) == 0x20); // Temporary hack because MSVC<1800 doesn't have stdbool.h.
+    will_retain = ((connect_flags & 0x20) == 0x20); 
     password_flag = connect_flags & 0x40;
     username_flag = connect_flags & 0x80;
 
@@ -527,7 +532,7 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
     if(mosquitto_property_read_string(properties, MQTT_PROP_AUTHENTICATION_METHOD, &context->auth_method, false)){
         mosquitto_property_read_binary(properties, MQTT_PROP_AUTHENTICATION_DATA, &auth_data, &auth_data_len, false);
     }
-    /* 两种属性未处理：请求响应信息，请求故障信息 */
+    /* 四种属性没有处理: 最大主题别名数，用户属性，请求响应信息，请求故障信息 */
     mosquitto_property_free_all(&properties); /* FIXME - TEMPORARY UNTIL PROPERTIES PROCESSED */
 
     /* 读取客户端ID */
@@ -621,7 +626,7 @@ int handle__connect(struct mosquitto_db *db, struct mosquitto *context)
     }else{
         if(context->protocol == mosq_p_mqtt311 || context->protocol == mosq_p_mqtt31){
             if(password_flag){
-                /* username_flag == 0 && password_flag == 1 is forbidden */
+                /* MQTT 5.0之前的版本不允许只有密码字段而没有用户名字段 */
                 log__printf(NULL, MOSQ_LOG_ERR, "Protocol error from %s: password without username, closing connection.", client_id);
                 rc = MOSQ_ERR_PROTOCOL;
                 goto handle_connect_error;

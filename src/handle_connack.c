@@ -26,6 +26,7 @@ Contributors:
 #include "send_mosq.h"
 #include "util_mosq.h"
 
+/* SRC文件夹下代码仅供服务器使用，服务器只有在bridge模式下才会收到CONNACK报文 */
 int handle__connack(struct mosquitto_db *db, struct mosquitto *context)
 {
     int rc;
